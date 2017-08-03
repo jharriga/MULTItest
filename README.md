@@ -13,8 +13,8 @@ to be tested. You will want to edit the 'vars.shinc' file variables prior to exe
 Here are the steps to complete a test:
   * edit device and runtime settings in 'vars.shinc'
   * run './setup.sh' as root <-- creates 'LOGFILEsetup'
-  * run './runMULTI.sh' as root  <-- creates 'RESULTS/<testname>_<timestamp>' logfile
+  * run './runMULTI.sh <device-mode> <run-mode>' as root  <-- creates 'RESULTS/<testname>_<timestamp>' logfile
   * run './teardown.sh' as root <-- creates 'LOGFILEteardown'
   
-NOTE: the runMULTI.sh script assumes that the device setup has previously been run.
+NOTE: the runMULTI.sh script assumes that the device setup script has previously been run.
 
