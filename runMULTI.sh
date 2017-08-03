@@ -76,22 +76,6 @@ updatelog "${PROGNAME} - Created logfile: $LOGFILE"
 
 updatelog "${PROGNAME} - deviceMODE is $deviceMODE; runMODE is $runMODE"
 
-# DEBUG - Hardcode the runTIME ; rampTIME
-#runTIME=60
-#rampTIME=30
-
-# Calculate runtime for backgrd jobs - padded to ensure they
-# stay active for the duration of all the [primary] jobs
-numjobs="${#fioJOBS[@]}"
-numjobs_padded=$(($numjobs + 1))
-bkgrd_rt=$(($runTIME * numjobs))
-
-# Write runtime environment and key variable values to LOGFILE
-print_Runtime
-
-updatelog "${PROGNAME} - preparing to run $numjobs fio jobs"
-updatelog "${PROGNAME} > each for $runTIME seconds"
-
 #
 # END: Housekeeping
 #--------------------------------------
@@ -104,8 +88,7 @@ updatelog "${PROGNAME} > each for $runTIME seconds"
 # Call teardown and then setup.sh ??
 #
 
-# Set the fname vars based on deviceMODE
-# set the FIO filename locations based on deviceMODE
+# Set the fname and runtime/ramptime vars based on deviceMODE
 # filename settings for fio runs
 if [ "$deviceMODE" = "setup" ] || [ "$deviceMODE" = "teardown" ]; then
   # do nothing
@@ -114,14 +97,20 @@ elif [ "$deviceMODE" = "xfshdd" ]; then
   fnameBACKUP="${hddMNT}0"
   fnameCLIENT="${hddMNT}1"
   fnamePRIMARY="${hddMNT}2"
+  runtime=$xfshdd_RUNT
+  ramptime=$xfshdd_RAMPT
 elif [ "$deviceMODE" = "xfsnvme" ]; then
   fnameBACKUP="${nvmeMNT}0"
   fnameCLIENT="${nvmeMNT}1"
   fnamePRIMARY="${nvmeMNT}2"
+  runtime=$xfsnvme_RUNT
+  ramptime=$xfsnvme_RAMPT
 elif [ "$deviceMODE" = "xfscached" ]; then
   fnameBACKUP="${cachedMNT}0"
   fnameCLIENT="${cachedMNT}1"
   fnamePRIMARY="${cachedMNT}2"
+  runtime=$xfscached_RUNT
+  ramptime=$xfscached_RAMPT
 else
   error_exit "$LINENO: invalid value for deviceMODE"
 fi
@@ -161,7 +150,20 @@ scratchBACKUP="${fnameBACKUP}/scratch_backup"
 scratchCLIENT="${fnameCLIENT}/scratch_client"
 scratchPRIMARY="${fnamePRIMARY}/scratch_primary"
 
-# print summary
+# Calculate runtime for backgrd jobs - ensure they
+# stay active for the duration of all the [primary] jobs
+numjobs="${#fioJOBS[@]}"
+numjobs_adjusted=$(($numjobs - 1))
+temp_rt=$(($runtime + $ramptime))
+bkgrd_rt=$(($temp_rt * numjobs_adjusted))
+
+# Write runtime environment and key variable values to LOGFILE
+print_Runtime
+
+updatelog "${PROGNAME} - preparing to run $numjobs fio jobs"
+updatelog "${PROGNAME} > each for $runtime seconds"
+
+# Print summary
 echo "deviceMODE is ${deviceMODE} - runMODE is ${runMODE}"
 echo "> scratchBACKUP is ${scratchBACKUP} : size ${scratchBACKUP_SZ}"
 echo "> scratchCLIENT is ${scratchCLIENT} : size ${scratchCLIENT_SZ}"
@@ -188,7 +190,11 @@ for fiojob in "${fioJOBS[@]}"; do
       ioeng="sync"
       direct=0
       filename="${scratchBACKUP}"
-      xtraFlags=""
+      if [ $runMODE = "isolated" ] || [ $runMODE = "combined" ]; then
+        xtraFlags="${backupRATE}"
+      else
+        xtraFlags=""
+      fi
       ;;
   client)
       offset="0G"
@@ -204,6 +210,7 @@ for fiojob in "${fioJOBS[@]}"; do
 #      esac
       rw="randrw"
       xtraFlags="--rwmixread=80"
+#      xtraFlags="--rwmixread=80 --numjobs=4"
       ;;
   primary*)
       bs="64k"
@@ -235,7 +242,7 @@ for fiojob in "${fioJOBS[@]}"; do
     updatelog "*************************"
     updatelog "STARTING: fio job - $fiojob"
     updatelog "FIO params: OFFSET=$offset; FILESZ=$fs; RW=$rw; BS=$bs; \
-               filename=$filename runtime=$runTIME $xtraFlags"
+        filename=$filename runtime=$runtime ramptime=$ramptime $xtraFlags"
 
     # ONLY NEEDED FOR fiojob [primary] and deviceMODE=xfscached
     # Output lvmcache statistics prior to this run
@@ -248,11 +255,10 @@ for fiojob in "${fioJOBS[@]}"; do
     # clear the cache prior to fio job
     sync; echo 3 > /proc/sys/vm/drop_caches
 
-#    sleep 10    # DEBUG
     # issue the fio job and wait for it to complete
     fio --offset=${offset} --filesize=${fs} --blocksize=${bs} --rw=${rw} \
       --ioengine=${ioeng} --direct=${direct} --filename=${filename} \
-      --time_based --runtime=${runTIME} --ramp_time=${rampTIME} \
+      --time_based --runtime=${runtime} --ramp_time=${ramptime} \
       --fsync_on_close=1 --group_reporting ${xtraFlags} \
       --name=${fiojob} --output=${res_file} >> $LOGFILE
 
@@ -282,13 +288,17 @@ for fiojob in "${fioJOBS[@]}"; do
     updatelog "FIO params: OFFSET=$offset; FILESZ=$fs; RW=$rw; BS=$bs; \
                filename=$filename runtime=$bkgrd_rt $xtraFlags"
 
-#    sleep 60 &    # DEBUG
-    # issue the fio job as background process and throw away results
+    fio_bkgrd_out="${RESULTSDIR}/${fiojob}_${deviceMODE}.bkgrd"
+    if [ -e $fio_bkgrd_out ]; then
+      rm -f $fio_bkgrd_out
+    fi
+    # Issue the fio job as background process
     fio --offset=${offset} --filesize=${fs} --blocksize=${bs} --rw=${rw} \
       --ioengine=${ioeng} --direct=${direct} --filename=${filename} \
       --time_based --runtime=${bkgrd_rt} \
       --fsync_on_close=1 --group_reporting ${xtraFlags} \
-      --name=${fiojob} > /dev/null 2>&1 &
+      --name=${fiojob} > ${fio_bkgrd_out} &
+#      --name=${fiojob} > /dev/null 2>&1 &
 
   fi               # end IF - standalone OR scratchPRIMARY
 
@@ -296,15 +306,17 @@ done         # end FOR fiojob
 
 ###################################################
 # Kill any background FIO processes
-updatelog "KILLING any leftover background FIO jobs..."
-pids_pgrep=$(pgrep -x fio)
-# DEBUG   pids_pgrep=$(pgrep sleep)
-pids=$(echo -n $pids_pgrep)
-echo "${pids}"
+updatelog "LISTING any leftover background FIO jobs..."
+echo "feel free to kill these manually"
+ps au | grep fio
+
+pids_pgrep=`echo -n $(pgrep -x fio)`
+#pids=$(echo -n $pids_pgrep)
+#echo $pids_pgrep
 pidpat="^[0-9]*"
-if [[ $pids =~ $pidpat ]]; then
+if [[ $pids_pgrep =~ $pidpat ]]; then
   updatelog "Background FIO jobs found - killing them now"
-  kill $pids
+  kill $pids_pgrep
 else
   updatelog "No background FIO jobs found running"
 fi

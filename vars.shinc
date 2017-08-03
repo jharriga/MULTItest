@@ -65,13 +65,26 @@ cachedMNT="/mnt/cached"
 fioJOBS=( \
    "backup"
    "client"
-#   "clientRR"
-#   "clientRW"
-#   "primary0G"
-#   "primary11G"
-#   "primary22G"
-#   "primary28G" \
+   "primary0G"
+   "primary11G"
+   "primary22G"
+   "primary28G" 
    )
+# Set to ten percent of LVMcache 'best case' perf for [backup] fio job
+# Using device-mode ‘xfscached’ and run-mode ‘standalone’
+#        runMULTI.sh xfscached standalone
+backupIOPS=615       # user must recalculate this for their env
+backupRATE="--rate_iops=${backupIOPS}"
+#backupRATE=""       # DEBUG to allow running with no rate limit
+
+# runtime and ramptime are used in runMULTI.sh
+# runTIME and rampTIME are used for fio jobs
+xfshdd_RUNT="100"
+xfshdd_RAMPT="30"
+xfscached_RUNT="600"
+xfscached_RAMPT="600"
+xfsnvme_RUNT="100"
+xfsnvme_RAMPT="30"
 
 ########################################################### 
 # Calculate the SIZEs, all based on unitSZ and cache_size values
@@ -157,15 +170,6 @@ scratchCACHE_SZ="$scratchCACHE_calc$unitSZ"
 scratchBACKUP_SZ=$scratchCACHE_SZ
 scratchCLIENT_SZ=$scratchCACHE_SZ
 scratchPRIMARY_SZ=$scratchCACHE_SZ
-
-########################################################### 
-# FIO Variables
-# runtime and ramptime are used in runMULTI.sh
-# runTIME and rampTIME are used for [primary] fio jobs
-runTIME="600"
-rampTIME="600"
-#runTIME="60"
-#rampTIME="30"
 
 # Array used in cacheStats function
 # Stores cache stats from last call - used to calculate deltas
