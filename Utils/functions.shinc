@@ -18,14 +18,16 @@ function print_Runtime {
 
 # Write key variable values to LOGFILE
   echo "Key Variable Values:" | tee -a $LOGFILE
-  updatelog "> slowDEV=${slowDEV_arr[*]}"
-  updatelog "> fastDEV=${fastDEV_arr[*]}"
-  updatelog "> fastSZ=${fastSZ} : slowSZ=${slowSZ}"
-  updatelog "> cacheSZ=${cacheSZ} - cacheMODE=${cacheMODE}"
-  updatelog "> metadataSZ=${metadataSZ}"
-  updatelog "> originSZ=${originSZ}"
+  updatelog "> hddDEV=${hddDEV_arr[*]}"
+  updatelog "> nvmeDEV=${nvmeDEV_arr[*]}"
+  updatelog "> LVMcache device settings:"
+  updatelog ">>> slowDEV=${slowDEV_arr[*]}"
+  updatelog ">>> fastDEV=${fastDEV_arr[*]}"
+  updatelog ">>> slowSZ=${slowSZ} - fastSZ=${fastSZ}"
+  updatelog ">>> cacheSZ=${cacheSZ} - cacheMODE=${cacheMODE}"
+  updatelog ">>> metadataSZ=${metadataSZ}"
+  updatelog ">>> originSZ=${originSZ}"
   echo "FIO variable settings:" | tee -a $LOGFILE
-  updatelog "> runtime=${runTIME} - ramptime=${rampTIME}"
   updatelog "> fioJOBS=${fioJOBS[*]}"
   updatelog "---------------------------------"
 }
