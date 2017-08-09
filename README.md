@@ -1,8 +1,10 @@
 # MULTItest
 Automation to drive multiple simultaneous I/O workloads on LVM cached devices.  
 Supports multiple 'device modes' and 'run modes' to allow comparing performance rates.  
-  * device-mode  Valid values are: xfshdd; xfsnvme; xfscached
-  * run-mode     Valid values are: standalone; isolated; combined
+  * device-mode
+    * Valid values are: xfshdd; xfsnvme; xfscached
+  * run-mode
+    * Valid values are: standalone; isolated; combined
 
 Includes scripts to setup and teardown the devices.  These scripts configure the devices
 to be tested. You will want to edit the 'vars.shinc' file variables prior to executing them:
