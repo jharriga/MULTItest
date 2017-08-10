@@ -105,26 +105,33 @@ echo "COMPLETED partitioning $fastDEV" | tee -a $LOGFILE
 lsblk | grep $fastDEV | tee -a $LOGFILE
 
 #----------------------------------
-# Third - do the LVMcached HDDs  <-- NOT REQUIRED
+# Third - do the LVMcached HDDs
+# Delete any existing partitions
 #
-#for hdd in "${slowDEV_arr[@]}"; do
-#  echo "Partitioning $hdd" | tee -a $LOGFILE
-#  echo "BEGIN: Listing matching device names"
-#  # List the available block devices
-#  lsblk | grep $hdd
-#  sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF2 | fdisk ${hdd}
-#    o       # clear the in memory partition table
-#    n       # new partition
-#    p       # primary partition
-#    1       # partition number 1
-#            # default, start at beginning of disk 
-#    +120G   # 100 GB partition
-#    p       # print the in-memory partition table
-#    w       # write the partition table
-#    q       # and we're done
-#EOF2
-#  echo "COMPLETED partitioning $hdd" | tee -a $LOGFILE
-#done
+for hdd in "${slowDEV_arr[@]}"; do
+  echo "Partitioning $hdd" | tee -a $LOGFILE
+  echo "Checking if ${hdd} is in use, if yes abort"
+  mount | grep ${hdd}
+  if [ $? == 0 ]; then
+    echo "Device ${hdd} is mounted - ABORTING Test!"
+    exit 1
+  fi
+
+# Clears any existing partition table and creates a new one
+#   with a single partion that is the entire disk
+    (echo o; echo n; echo p; echo 1; echo; echo; echo w) | \
+      fdisk ${hdd} >> $LOGFILE
+# Now delete that partition
+  for partition in $(parted -s ${hdd} print|awk '/^ / {print $1}'); do
+    echo "Removing parition: dev=${hdd} - partition=${partition}"
+    parted -s $hdd rm ${partition}
+    if [ $? != 0 ]; then
+      echo "$LINENO: Unable to remove ${partition} from ${hdd}"
+      exit 1
+    fi
+  done
+  echo "COMPLETED removed any partitions from: $hdd" | tee -a $LOGFILE
+done
 
 echo "COMPLETED partitioning all devices" | tee -a $LOGFILE
 
