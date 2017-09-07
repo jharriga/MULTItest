@@ -1,5 +1,5 @@
 # MULTItest
-Automation to drive multiple simultaneous I/O workloads on hard disks; NVMe and LVM cached devices.  
+Automation to drive multiple simultaneous I/O workloads on a single server with: hard disks; NVMe and LVM cached devices.  
 Supports multiple 'device modes' and 'run modes' to allow comparing performance rates.  
   * device-mode
     * Valid values are: xfshdd; xfsnvme; xfscached
